@@ -90,6 +90,7 @@ noNA_median_steps <- data.frame(summarize(noNA_group_activity, median(steps)))
 1. Compared to weekends, people get up earlier on workdays
 2. On weekends, the number of steps from morning (after commute) to afternoon is more than those on weekdays
 
+```{r comparing the average number of steps taken per 5-minute interval across weekdays and weekends, fig.width=10}
 temp <- merge(noNA_mean_steps, mean_steps, by.x = "date", by.y = "date", all.x = TRUE)
 temp <- merge(temp, noNA_median_steps, by.x = "date", by.y = "date", all.x = TRUE)
 temp <- merge(temp, median_steps, by.x = "date", by.y = "date", all.x = TRUE)
