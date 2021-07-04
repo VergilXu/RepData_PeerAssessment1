@@ -5,21 +5,102 @@ output:
     keep_md: true
 ---
 
+```{r}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+Loading packages
+
+```{r, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(lattice)
+```
 
 ## Loading and preprocessing the data
 
+```{r total numerber}
+activity <- read.csv("./activity.csv")
+```
 
 
 ## What is mean total number of steps taken per day?
 
+```{r histgram, fig.width = 10, fig.height=5}
+activity <- activity[which(!is.na(activity$steps)), ]
+sum_steps <- aggregate(steps~date, activity, sum, na.rm = TRUE)
+g <- ggplot(sum_steps, aes(x = date, y = steps))
+g + geom_histogram(stat='identity') + theme(axis.text.x = element_text(angle=90, hjust=1, vjust=0.5)) + labs(title = "The total number of steps taken each day") +  theme(plot.title = element_text(hjust = 0.5, size = 15))
+```
 
+## Mean and median number of steps taken each day
+
+```{r mean and median number of steps}
+group_activity <- group_by(activity, date)
+mean_steps <- data.frame(summarize(group_activity, mean(steps)))
+median_steps <- data.frame(summarize(group_activity, median(steps)))
+mean_median_steps <- merge(mean_steps, median_steps, by.x = "date", by.y = "date", all.x = TRUE)
+mean_median_steps
+```
 
 ## What is the average daily activity pattern?
+### Time series plot of the average number of steps all the days
 
+```{r average number of steps, fig.width=10}
+group_activity <- group_by(activity, interval)
+mean_interval_steps <- data.frame(summarize(group_activity, mean(steps)))
+mean_interval_steps <- rename(mean_interval_steps, steps = "mean.steps.")
+g <- ggplot(mean_interval_steps, aes(x = interval, y = steps))
+g + geom_line(size = 1) + labs(title = "The average number of steps per 5 minutes") + theme(plot.title = element_text(hjust = 0.5, size = 15))
+```
 
+## The 5-minute interval that, on average, contains the maximum number of steps
+
+```{r maximum number of steps}
+max_steps_interval <- filter(mean_interval_steps, steps == max(mean_interval_steps$steps))$interval
+```
 
 ## Imputing missing values
 
+```{r imputing missing data}
+activity <- read.csv("./activity.csv")
+missing_value <- activity[is.na(activity$steps), ]
+integer_interval_steps <- round(mean_interval_steps)
+Imputing_missing_value <- merge(missing_value, integer_interval_steps, by.x = "interval", by.y = "interval", all.x = TRUE)
+missing_value$id <- 1:nrow(missing_value)
+Imputing_missing_value <- arrange(merge(missing_value, integer_interval_steps, by.x = "interval", by.y = "interval", all.x = TRUE), id)
+Imputing_missing_value <- Imputing_missing_value[ ,c(-2,-4)]
+noNa_activity <- activity
+noNa_activity[is.na(noNa_activity$steps), ]$steps <- Imputing_missing_value$steps.y
+noNa_activity <- noNa_activity
+```
 
+## Histogram of the total number of steps taken each day after missing values are imputed
+
+```{r histgram for total numer os steps after missing values are imputed, fig.width=10}
+noNa_sum_steps <- aggregate(steps~date, noNa_activity, sum)
+g <- ggplot(noNa_sum_steps, aes(x = date, y = steps))
+g + geom_histogram(stat='identity') + theme(axis.text.x = element_text(angle=90, hjust=1, vjust=0.5)) + labs(title = "The total number of steps taken each day after imputing missing value") +  theme(plot.title = element_text(hjust = 0.5, size = 15))
+noNA_group_activity <- group_by(noNa_activity, date)
+noNA_mean_steps <- data.frame(summarize(noNA_group_activity, mean(steps)))
+noNA_median_steps <- data.frame(summarize(noNA_group_activity, median(steps)))
+```
 
 ## Are there differences in activity patterns between weekdays and weekends?
+1. Compared to weekends, people get up earlier on workdays
+2. On weekends, the number of steps from morning (after commute) to afternoon is more than those on weekdays
+
+temp <- merge(noNA_mean_steps, mean_steps, by.x = "date", by.y = "date", all.x = TRUE)
+temp <- merge(temp, noNA_median_steps, by.x = "date", by.y = "date", all.x = TRUE)
+temp <- merge(temp, median_steps, by.x = "date", by.y = "date", all.x = TRUE)
+Imputation_contrast <- rename(temp, meansteps_afterImputation = mean.steps..x, meansteps_beforeImputation = mean.steps..y, mediansteps_afterImputation = median.steps..x, mediansteps_beforeImputation= median.steps..y)
+Sys.setlocale("LC_TIME", "English")
+noNa_activity$date <- as.Date(noNa_activity$date)
+noNa_activity$label <- weekdays(noNa_activity$date, abbreviate = TRUE)
+noNa_activity[which(grepl("S(at|un)", noNa_activity$label)), ]$label <- "weekend"
+noNa_activity[(noNa_activity$label != "weekend"), ]$label <- "weekday"
+noNa_activity$label <- as.factor(noNa_activity$label)
+plot <- aggregate(noNa_activity[,1], by = list(interval = noNa_activity$interval, label = noNa_activity$label), FUN = mean)
+plot <- rename(plot, steps = x)
+xyplot(steps ~ interval| label, data = plot, layout = c(1, 2), type = "l", main = "The average number of steps taken per 5-minute interval across weekdays and weekends")
+```
